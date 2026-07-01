@@ -65,4 +65,5 @@ Create a `.env` file at the project root (never commit this file). Required vari
 |---|---|---|
 | Client | Andrew Demski | andrew.demski@demskigroupdev.com |
 | Client | Aaron Demski | aaron.demski@demskigroupdev.com |
-| Lead Dev | Amar | Ethixweb |
+| Head of Client Strategy | Amar | Ethixweb |
+| Lead Developer | Akash | Ethixweb |
