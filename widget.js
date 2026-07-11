@@ -79,8 +79,12 @@
     'display:flex!important;align-items:flex-end!important;gap:8px!important;max-width:88%!important;';
   /* background/color are deliberately NOT inline here (unlike every other
    * property) — they're left to the .cb-bot-msg / .cb-user-msg CSS classes
-   * (also applied on these same elements), which define the widget's single
-   * light-theme look. */
+   * (also applied on these same elements) specifically so the
+   * prefers-color-scheme:dark media query in CSS can actually govern them.
+   * An inline !important, even matched by an external !important rule,
+   * always wins over the stylesheet regardless of media query state — so
+   * keeping these two properties inline would make dark mode permanently
+   * unreachable for message bubbles no matter what the CSS says. */
   var BOT_STYLE =
     'padding:10px 14px!important;' +
     'border-radius:4px 18px 18px 18px!important;font-size:13.5px!important;' +
