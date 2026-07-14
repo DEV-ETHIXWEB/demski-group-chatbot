@@ -7,6 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const NOTIFY_TO = ['andrew.demski@demskigroupdev.com', 'aaron.demski@demskigroupdev.com'];
 const FROM_EMAIL = 'aaron.demski@demskigroupdev.com';
+const CONFIRMATION_FROM_EMAIL = 'contact@demskigroupdev.com';
 
 const LEAD_FIELDS = [
   'intent', 'intent_detail', 'budget', 'project_notes',
@@ -127,7 +128,7 @@ export default async function handler(req, res) {
 
   const confirmationMsg = {
     to: lead.email,
-    from: FROM_EMAIL,
+    from: CONFIRMATION_FROM_EMAIL,
     subject: 'Thanks for reaching out to The Demski Group',
     html: fillTemplate(confirmationHtml, {
       user_name: lead.name,
@@ -137,7 +138,7 @@ export default async function handler(req, res) {
   };
 
   log('Sending lead notification to', NOTIFY_TO, 'from', FROM_EMAIL);
-  log('Sending confirmation to', lead.email, 'from', FROM_EMAIL);
+  log('Sending confirmation to', lead.email, 'from', CONFIRMATION_FROM_EMAIL);
 
   // Send independently (not Promise.all) so one failing recipient doesn't
   // mask whether the other actually succeeded — both results are reported.

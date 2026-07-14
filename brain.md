@@ -283,7 +283,9 @@ inert literal text, not parsed markup. No escaping step to forget.
 
 ## 6. `api/send-lead.js` — lead delivery (SendGrid, not EmailJS)
 
-- `sgMail` via `SENDGRID_API_KEY` env var. `FROM_EMAIL = aaron.demski@demskigroupdev.com`.
+- `sgMail` via `SENDGRID_API_KEY` env var. Internal notification sent from
+  `FROM_EMAIL = aaron.demski@demskigroupdev.com`; visitor confirmation sent
+  from `CONFIRMATION_FROM_EMAIL = contact@demskigroupdev.com`.
   Notifies `NOTIFY_TO = [andrew.demski@..., aaron.demski@...]`.
 - Two emails sent independently via `Promise.allSettled` (not `Promise.all`) —
   one failing recipient never masks whether the other succeeded; response
