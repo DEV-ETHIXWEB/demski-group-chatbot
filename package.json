@@ -6,7 +6,11 @@
   "description": "Standalone embeddable lead-capture chatbot for The Demski Group",
   "scripts": {
     "dev": "npx serve . -l 3000",
-    "start": "npx serve . -l 3000"
+    "start": "node server.mjs",
+    "build": "node scripts/prepare-amplify.mjs"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.4"

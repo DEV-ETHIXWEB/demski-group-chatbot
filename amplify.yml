@@ -3,19 +3,15 @@ frontend:
   phases:
     preBuild:
       commands:
-        - echo "Static widget bundle — no install step required"
+        - nvm use 22
+        - npm ci
     build:
       commands:
-        - echo "No build step — files are served as-is"
+        - npm run build
   artifacts:
-    baseDirectory: .
+    baseDirectory: .amplify-hosting
     files:
-      - index.html
-      - widget.js
-      - loader.js
-      - Logo3.png
-      - Logo3-768x137.webp
-      - avatar-alex.png
-      - test-pages/**/*
+      - '**/*'
   cache:
-    paths: []
+    paths:
+      - node_modules/**/*

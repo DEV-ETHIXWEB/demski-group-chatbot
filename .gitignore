@@ -1,5 +1,6 @@
 node_modules/
 .vercel/
+.amplify-hosting/
 .env
 .env.local
 .env.*
