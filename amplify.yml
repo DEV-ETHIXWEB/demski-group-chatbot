@@ -1,0 +1,21 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "Static widget bundle — no install step required"
+    build:
+      commands:
+        - echo "No build step — files are served as-is"
+  artifacts:
+    baseDirectory: .
+    files:
+      - index.html
+      - widget.js
+      - loader.js
+      - Logo3.png
+      - Logo3-768x137.webp
+      - avatar-alex.png
+      - test-pages/**/*
+  cache:
+    paths: []

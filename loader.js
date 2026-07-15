@@ -6,7 +6,13 @@
  *
  * Optional data attributes are forwarded to the widget:
  *   data-avatar, data-avatar-fallback, data-calendly,
- *   data-bot-name, data-bot-title
+ *   data-bot-name, data-bot-title, data-api-base
+ *
+ * data-api-base: set this to a separate API origin (e.g. an AWS Lambda
+ * Function URL host) when widget.js is not served from the same origin as
+ * /api/chat and /api/send-lead — e.g. widget.js on AWS Amplify Hosting with
+ * the API deployed as standalone Lambda Function URLs. Leave unset when the
+ * API is same-origin with widget.js (e.g. Vercel).
  */
 (function () {
   'use strict';

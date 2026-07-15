@@ -51,6 +51,12 @@
   var CALENDLY_URL  = scriptAttr('data-calendly', 'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ3loQplPyCXe28FPP0trIgOCmhJqwKCXka1x3uCkblaAFtklpetKpkyi6glNBGxVR8jpOQenySG');
   var BOT_NAME      = scriptAttr('data-bot-name', 'Erin');
   var BOT_TITLE     = scriptAttr('data-bot-title', 'The Demski Group');
+  /* Optional cross-origin API host (e.g. an AWS Lambda Function URL) for
+   * deployments where the API isn't served from the same origin as this
+   * script (e.g. widget.js on Amplify Hosting, api/chat + api/send-lead as
+   * separate Lambda Function URLs). Empty by default, which preserves the
+   * original same-origin behavior below unchanged. */
+  var API_BASE_OVERRIDE = scriptAttr('data-api-base', '').replace(/\/+$/, '');
 
   /* ── CONSTANTS ── */
   var IDLE_MSG_ID    = 'cb-idle-msg';
@@ -753,8 +759,11 @@
       mcqRevealToken++;
     }
 
-    /* Derive API endpoint from widget.js src — same origin as the widget */
+    /* Derive API endpoint from widget.js src — same origin as the widget,
+     * unless data-api-base points it at a separate host (see
+     * API_BASE_OVERRIDE above). */
     var API_URL = (function () {
+      if (API_BASE_OVERRIDE) return API_BASE_OVERRIDE + '/api/chat';
       try {
         var base = new URL(SCRIPT_EL.src, location.href).href.replace(/\/[^/]*$/, '/');
         return base + 'api/chat';
@@ -2440,6 +2449,7 @@
     }
 
     var LEAD_URL = (function () {
+      if (API_BASE_OVERRIDE) return API_BASE_OVERRIDE + '/api/send-lead';
       try {
         var base = new URL(SCRIPT_EL.src, location.href).href.replace(/\/[^/]*$/, '/');
         return base + 'api/send-lead';
