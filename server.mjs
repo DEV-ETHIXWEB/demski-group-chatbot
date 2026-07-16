@@ -75,6 +75,47 @@ const routes = {
   '/api/send-lead': sendLeadHandler,
 };
 
+// Lightweight in-memory rate limiter — defense-in-depth BEHIND AWS WAF (the
+// primary rate control at the CloudFront edge). This is best-effort: state is
+// per compute instance and resets on cold start, and it is strictly
+// FAIL-OPEN — any error in the check lets the request through, so a limiter
+// bug can never block real traffic. Limits sit far above real usage (a normal
+// visitor sends a few chats and at most one lead), so legitimate users are
+// never affected; only crude flooding from a single IP is slowed.
+const RATE_LIMITS = {
+  '/api/chat': { max: 40, windowMs: 60_000 },
+  '/api/send-lead': { max: 8, windowMs: 60_000 },
+};
+const rateHits = new Map(); // key -> { count, resetAt }
+
+function clientIp(req) {
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.length) return xff.split(',')[0].trim();
+  return (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+
+function isRateLimited(req, pathname) {
+  try {
+    const cfg = RATE_LIMITS[pathname];
+    if (!cfg) return false;
+    const now = Date.now();
+    const key = pathname + '|' + clientIp(req);
+    let entry = rateHits.get(key);
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 0, resetAt: now + cfg.windowMs };
+      rateHits.set(key, entry);
+    }
+    entry.count += 1;
+    // Opportunistic cleanup so the map can't grow unbounded.
+    if (rateHits.size > 5000) {
+      for (const [k, v] of rateHits) if (now > v.resetAt) rateHits.delete(k);
+    }
+    return entry.count > cfg.max;
+  } catch {
+    return false; // fail-open
+  }
+}
+
 const server = createServer(async (req, res) => {
   enhanceResponse(res);
 
@@ -91,6 +132,13 @@ const server = createServer(async (req, res) => {
     res.statusCode = 404;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: 'Not found' }));
+    return;
+  }
+
+  if (req.method === 'POST' && isRateLimited(req, pathname)) {
+    res.statusCode = 429;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Too many requests, please slow down.' }));
     return;
   }
 
