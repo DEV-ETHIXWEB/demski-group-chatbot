@@ -36,6 +36,32 @@ function fillTemplate(html, data) {
   });
 }
 
+// Mask PII before it reaches the logs (CloudWatch). Enough remains to debug
+// (domain, last 4 digits, first initial) without storing raw personal data
+// in log retention. These are used only for logging — the real, unmasked
+// values still flow to the email templates unchanged.
+function maskEmail(email) {
+  if (!email || typeof email !== 'string' || !email.includes('@')) return '[redacted]';
+  const [local, domain] = email.split('@');
+  return (local.slice(0, 1) || '') + '***@' + domain;
+}
+function maskPhone(phone) {
+  if (!phone || typeof phone !== 'string') return '';
+  const digits = phone.replace(/\D/g, '');
+  return digits.length < 4 ? '***' : '***' + digits.slice(-4);
+}
+function redactLead(lead) {
+  return {
+    intent: lead.intent,
+    budget: lead.budget,
+    name: lead.name ? lead.name.slice(0, 1) + '***' : '',
+    email: maskEmail(lead.email),
+    phone: maskPhone(lead.phone),
+    cta_choice: lead.cta_choice,
+    page: lead.page,
+  };
+}
+
 function log(...args) {
   console.log('[send-lead]', ...args);
 }
@@ -85,10 +111,10 @@ export default async function handler(req, res) {
   const lead = {};
   for (const field of LEAD_FIELDS) lead[field] = body[field] || '';
 
-  log('Incoming lead payload:', lead);
+  log('Incoming lead (redacted):', redactLead(lead));
 
   if (!lead.email || !lead.name) {
-    logError('Missing required fields. name=%s email=%s', lead.name, lead.email);
+    logError('Missing required fields. name=%s email=%s', lead.name ? 'set' : 'missing', lead.email ? 'set' : 'missing');
     return res.status(400).json({ error: 'Missing required lead fields (name, email)' });
   }
 
@@ -115,8 +141,10 @@ export default async function handler(req, res) {
     notificationHtml = readTemplate('chatbot-lead-notification.html');
     confirmationHtml = readTemplate('chatbot-lead-confirmation.html');
   } catch (e) {
+    // Full detail (paths, cwd) goes to server logs only; the client gets a
+    // generic message so internal filesystem layout isn't disclosed.
     logError('Failed to read email templates:', e.message, '__dirname=', __dirname, 'cwd=', process.cwd());
-    return res.status(500).json({ error: 'Email templates not found on server', detail: e.message, dirname: __dirname, cwd: process.cwd() });
+    return res.status(500).json({ error: 'Email service temporarily unavailable' });
   }
 
   const notificationMsg = {
@@ -138,7 +166,7 @@ export default async function handler(req, res) {
   };
 
   log('Sending lead notification to', NOTIFY_TO, 'from', FROM_EMAIL);
-  log('Sending confirmation to', lead.email, 'from', CONFIRMATION_FROM_EMAIL);
+  log('Sending confirmation to', maskEmail(lead.email), 'from', CONFIRMATION_FROM_EMAIL);
 
   // Send independently (not Promise.all) so one failing recipient doesn't
   // mask whether the other actually succeeded — both results are reported.
@@ -157,18 +185,21 @@ export default async function handler(req, res) {
   }
 
   if (confirmationOk) {
-    log('User confirmation email: SENT to', lead.email);
+    log('User confirmation email: SENT to', maskEmail(lead.email));
   } else {
     logError('User confirmation email: FAILED —', JSON.stringify(describeSendGridError(confirmationResult.reason)));
   }
 
+  // Client responses carry only the boolean send status — the underlying
+  // SendGrid error detail is already in the server logs above (lines
+  // logError'd per-recipient) and is not echoed to the browser. The widget
+  // only reads ok/notificationSent/confirmationSent, so this is behaviorally
+  // identical to before for users.
   if (!notificationOk && !confirmationOk) {
-    const detail = describeSendGridError(notificationResult.reason);
     log('Final API response: 502, both emails failed');
     return res.status(502).json({
       ok: false,
-      error: 'Both notification and confirmation emails failed to send',
-      detail,
+      error: 'Failed to send emails',
     });
   }
 
@@ -178,9 +209,6 @@ export default async function handler(req, res) {
       ok: false,
       notificationSent: notificationOk,
       confirmationSent: confirmationOk,
-      error: !notificationOk
-        ? describeSendGridError(notificationResult.reason)
-        : describeSendGridError(confirmationResult.reason),
     });
   }
 

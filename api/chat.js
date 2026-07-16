@@ -332,6 +332,22 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid messages' });
   }
 
+  // Abuse guard: a legitimate widget conversation sends a modest, bounded
+  // history. Reject absurdly large payloads outright so a caller can't run
+  // up OpenAI input-token cost with a giant messages array or huge strings.
+  // These caps sit far above any real conversation, so normal use is
+  // unaffected.
+  const MAX_MESSAGES = 100;
+  const MAX_MESSAGE_CHARS = 8000;
+  if (messages.length > MAX_MESSAGES) {
+    return res.status(400).json({ error: 'Too many messages' });
+  }
+  for (const m of messages) {
+    if (m && typeof m.content === 'string' && m.content.length > MAX_MESSAGE_CHARS) {
+      return res.status(400).json({ error: 'Message too long' });
+    }
+  }
+
   try {
     // Retrieval: pull the most relevant knowledge-base entries for the
     // latest user message and append them to the system prompt for this
@@ -368,8 +384,13 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
+      // Log the upstream detail server-side (CloudWatch) but never return
+      // the raw OpenAI error body to the browser — it can echo request
+      // details/quota info. The widget only reads `reply` (falling back to
+      // its own message), so a generic error changes nothing users see.
       const err = await response.text();
-      return res.status(response.status).json({ error: err });
+      console.error('[chat] OpenAI API error', response.status, err);
+      return res.status(502).json({ error: 'Upstream AI service error' });
     }
 
     const data = await response.json();
@@ -379,6 +400,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ reply: stripMarkdown(reply.replace(/—/g, ',')), stepAnswered, matchedOption, redirected, collectContact, refused, leadInfo, hints, needsOptions, readyForContact, conversationEnding });
 
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    console.error('[chat] Unhandled error:', e);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
