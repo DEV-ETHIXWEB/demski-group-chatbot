@@ -2458,6 +2458,53 @@
       }
     })();
 
+    /* Conversion tracking (Cosmoforge): pushed once per captured lead, only
+     * after /api/send-lead confirms success. Same {event, inputs, formName}
+     * shape as the site's forms (mirroring the old Elementor-form event) so
+     * the GTM-W476LNT container's existing triggers fire unchanged, with
+     * formName 'chatbot' to distinguish the source. Reads fbc/fbp/ga from
+     * the _fbc/_fbp/_ga cookies (set by the pixels GTM loads); utm fields
+     * and gclid come from the widget's own capture, gbraid from the same
+     * URL-param store. Never throws, never blocks the conversation. */
+    var leadTracked = false;
+    function trackLeadConversion() {
+      if (leadTracked) return;
+      leadTracked = true;
+      try {
+        function cbCookie(cname) {
+          try {
+            var m = document.cookie.match(new RegExp('(?:^|; )' + cname + '=([^;]*)'));
+            return m ? decodeURIComponent(m[1]) : '';
+          } catch (e) { return ''; }
+        }
+        var t = (typeof window.__dgTracking === 'function' && window.__dgTracking()) || {};
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: 'formSubmission',
+          formName: 'chatbot',
+          inputs: {
+            name: lead.name || '', email: lead.email || '', phone: lead.phone || '',
+            company: lead.company || '',
+            intent: lead.intent || '', intent_detail: lead.intent_detail || '',
+            budget: lead.budget || '', project_notes: lead.project_notes || '',
+            cta_choice: lead.cta_choice || '',
+            page: lead.page || '', page_name: lead.page_name || '',
+            gclid: lead.gclid || t.gclid || '',
+            gbraid: fp.gbraid || t.gbraid || '',
+            utm_campaign: lead.utm_campaign || t.utm_campaign || '',
+            utm_medium: lead.utm_medium || t.utm_medium || '',
+            utm_source: lead.utm_source || t.utm_source || '',
+            utm_content: lead.utm_content || t.utm_content || '',
+            utm_term: lead.utm_term || t.utm_term || '',
+            fbc: t.fbc || cbCookie('_fbc') || '',
+            fbp: t.fbp || cbCookie('_fbp') || '',
+            ga: t.ga || cbCookie('_ga') || ''
+          }
+        });
+        logDebug('trackLeadConversion: dataLayer event pushed');
+      } catch (e) { logDebug('trackLeadConversion failed (non-blocking):', e); }
+    }
+
     function submitLead() {
       var p = {
         intent: lead.intent, intent_detail: lead.intent_detail,
@@ -2480,6 +2527,7 @@
             throw new Error('Lead API responded ' + res.status + ': ' + (data.error ? JSON.stringify(data.error) : 'unknown error'));
           }
           logDebug('submitLead: success', data);
+          trackLeadConversion();
         });
       }).catch(function (e) {
         console.warn('[Demski Chatbot] Lead send failed:', e.message || e);
