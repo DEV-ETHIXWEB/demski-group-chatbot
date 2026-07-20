@@ -47,6 +47,7 @@ writeFileSync(
   JSON.stringify({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
     SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
+    ZAPIER_WEBHOOK_URL: process.env.ZAPIER_WEBHOOK_URL || '',
   })
 );
 

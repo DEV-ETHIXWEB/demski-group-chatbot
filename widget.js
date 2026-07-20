@@ -2506,6 +2506,19 @@
     }
 
     function submitLead() {
+      /* gbraid/fbc/fbp/ga ride along in the lead payload so the server can
+       * forward the full attribution set to the Zapier webhook. Same sources
+       * as trackLeadConversion above: the site's __dgTracking helper when
+       * present, falling back to the widget's own URL-param store (gbraid)
+       * and the _fbc/_fbp/_ga cookies. Always strings, never throws. */
+      var trk = {};
+      try { trk = (typeof window.__dgTracking === 'function' && window.__dgTracking()) || {}; } catch (e) { trk = {}; }
+      function leadCookie(cname) {
+        try {
+          var m = document.cookie.match(new RegExp('(?:^|; )' + cname + '=([^;]*)'));
+          return m ? decodeURIComponent(m[1]) : '';
+        } catch (e) { return ''; }
+      }
       var p = {
         intent: lead.intent, intent_detail: lead.intent_detail,
         budget: lead.budget,
@@ -2514,7 +2527,11 @@
         page: lead.page, page_name: lead.page_name,
         utm_source: lead.utm_source, utm_campaign: lead.utm_campaign,
         utm_medium: lead.utm_medium, utm_term: lead.utm_term,
-        utm_content: lead.utm_content, gclid: lead.gclid
+        utm_content: lead.utm_content, gclid: lead.gclid,
+        gbraid: fp.gbraid || trk.gbraid || '',
+        fbc: trk.fbc || leadCookie('_fbc') || '',
+        fbp: trk.fbp || leadCookie('_fbp') || '',
+        ga: trk.ga || leadCookie('_ga') || ''
       };
       logDebug('submitLead: POSTing payload to', LEAD_URL, p);
       fetch(LEAD_URL, {

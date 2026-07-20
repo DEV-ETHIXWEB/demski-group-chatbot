@@ -14,7 +14,39 @@ const LEAD_FIELDS = [
   'name', 'phone', 'email', 'company', 'cta_choice',
   'page', 'page_name',
   'utm_source', 'utm_campaign', 'utm_medium', 'utm_term', 'utm_content', 'gclid',
+  'gbraid', 'fbc', 'fbp', 'ga',
 ];
+
+// Zapier Catch Hook (Cosmoforge). Fired server-side after a successful lead
+// submission so ONE implementation covers every source (contact form, the
+// shared ContactSection, the calculator, and the chatbot) and the hook URL
+// never appears in the public repo or in browser code. The URL comes from the
+// ZAPIER_WEBHOOK_URL env var (baked into the compute bundle at build time by
+// scripts/prepare-amplify.mjs, same mechanism as the other keys).
+// Fire-and-forget: any failure is logged and never affects the API response,
+// the emails, or the visitor's experience.
+function sendToZapier(lead) {
+  const url = process.env.ZAPIER_WEBHOOK_URL;
+  if (!url) {
+    logError('ZAPIER_WEBHOOK_URL not set — skipping webhook');
+    return;
+  }
+  const payload = { ...lead, submitted_at: new Date().toISOString() };
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(8000),
+  }).then((res) => {
+    if (res.ok) {
+      log('Zapier webhook: delivered (HTTP', res.status + ')');
+    } else {
+      logError('Zapier webhook: rejected with HTTP', res.status);
+    }
+  }).catch((e) => {
+    logError('Zapier webhook: failed (non-blocking) —', e.message);
+  });
+}
 
 // Lead field values come straight from an anonymous website visitor and are
 // inserted into HTML emails opened in a real mail client — without escaping,
@@ -202,6 +234,11 @@ export default async function handler(req, res) {
       error: 'Failed to send emails',
     });
   }
+
+  // Successful submission (at least one email delivered) — forward the full
+  // lead to Zapier. Fire-and-forget: sendToZapier never throws and is not
+  // awaited, so it cannot delay or fail the API response below.
+  sendToZapier(lead);
 
   if (!notificationOk || !confirmationOk) {
     log('Final API response: 207, partial success');
